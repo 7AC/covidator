@@ -8,7 +8,7 @@ from __future__ import absolute_import, division, print_function
 import datetime
 import os
 import os.path
-import pdftotext
+import subprocess
 
 
 def validate_result(result, patients):
@@ -23,9 +23,11 @@ def validate_result(result, patients):
    today = datetime.date.today()
    day = None
    for i in range(6):
-      if (today - i).strftime('%m/%d/%Y') in result:
-         day = today - i
-         break
+      candidate = today - datetime.timedelta(days=i)
+      if candidate.strftime('%m/%d/%Y') in result:
+         # Use the earliest date in the file to be safe
+         if not day or day > candidate:
+            day = candidate
    if not day:
       return None
    if 'Negative' not in result:
@@ -39,15 +41,21 @@ def main():
       patients = set(patients_file.read().splitlines())
    patients_tested = set()
    results_dir = 'results'
+   results_tmp = '/tmp/result.txt'
    for results_file in os.listdir(results_dir):
       results_file_path = os.path.join(results_dir, results_file)
-      with open(results_file_path) as results_file:
-         pdf = pdftotext.PDF(results_file)
-      for page in pdf:
-         patient = validate_result(page, patients)
-         if patient:
-            patients_tested.add(patient)
-   print(patients - patients_tested)
+      # This is a workaround for https://github.com/jalan/pdftotext/issues/36
+      subprocess.run(['pdftotext', results_file_path, results_tmp], check=True)
+      with open(results_tmp) as text:
+         patient = validate_result(text.read(), patients)
+      if patient:
+         print('Found a valid test result for %s in %s' % (patient, results_file))
+         patients_tested.add(patient)
+   untested = patients - patients_tested
+   if untested:
+      print('The following patients are missing test results:', untested)
+   else:
+      print('All %d patients have been tested' % len(patients))
 
 
 if __name__ == "__main__":
