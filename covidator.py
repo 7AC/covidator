@@ -11,7 +11,7 @@ import os.path
 import subprocess
 
 
-def validate_result(result, patients):
+def validate_result(result, patients, days=30):
    """ Validate a test result"""
    result_patient = None
    for patient in patients:
@@ -22,7 +22,7 @@ def validate_result(result, patients):
       return None
    today = datetime.date.today()
    day = None
-   for i in range(6):
+   for i in range(days - 1):
       candidate = today - datetime.timedelta(days=i)
       if candidate.strftime('%m/%d/%Y') in result:
          # Use the earliest date in the file to be safe
@@ -51,9 +51,14 @@ def main():
       if patient:
          print('Found a valid test result for %s in %s' % (patient, results_file))
          patients_tested.add(patient)
+      else:
+         print('No valid test results in', results_file)
    untested = patients - patients_tested
+   print()
    if untested:
-      print('The following patients are missing test results:', untested)
+      print('The following patients are missing test results:')
+      for patient in untested:
+         print(' *', patient)
    else:
       print('All %d patients have been tested' % len(patients))
 
